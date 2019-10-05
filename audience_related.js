@@ -19,9 +19,9 @@ db.connect(function (err) {
     if (err) throw err;
 
     let sql = "SELECT *, " +
-	"( SELECT SUM( `comment` ) FROM post_related WHERE influencer_id = influencers.id ORDER BY post_related.id LIMIT 12 ) AS comments, " +
-	"( SELECT SUM( `like` ) FROM post_related WHERE influencer_id = influencers.id ORDER BY post_related.id LIMIT 12 ) AS likes " +
-    "FROM influencers WHERE STATUS = '1'";
+	"( SELECT SUM( `comment` ) FROM post_relateds WHERE influencer_id = influencers.id ORDER BY post_relateds.id LIMIT 12 ) AS comments, " +
+	"( SELECT SUM( `like` ) FROM post_relateds WHERE influencer_id = influencers.id ORDER BY post_relateds.id LIMIT 12 ) AS likes " +
+    "FROM influencers WHERE STATUS = '1' ORDER BY id ASC";
     db.query(sql, function (err, result) {
         if (err) throw err;
 
@@ -51,7 +51,7 @@ async function crowling(influencer) {
         // await page.type(ID.pass, CRED.pass);
         // await page.click('div[role="button"]')
 
-        await page.goto('https://instagram.com/' + influencer.instagram_username, {
+        await page.goto('https://www.instagram.com/' + influencer.instagram_username, {
             waitUntil: 'networkidle2'
         });
 
@@ -69,6 +69,22 @@ async function crowling(influencer) {
         const followings = await page.$x('//*[@id="react-root"]/section/main/div/header/section/ul/li[3]/a/span')
         let following = await page.evaluate(following => following.textContent, followings[0]);
 
+        const profile_images = await page.$x('//*[@id="react-root"]/section/main/div/header/div/div/span/img')
+        let profile_image = null;
+
+        // console.log(profile_images);
+
+        if(typeof profile_images !== 'undefined' && profile_images.length > 0){
+            profile_image = await page.evaluate(profile_image => profile_image.getAttribute("src"), profile_images[0]);
+            console.log("ada story");
+        } else {
+            const profile_images2 = await page.$x('//*[@id="react-root"]/section/main/div/header/div/div/div/button/img')
+            profile_image = await page.evaluate(profile_image => profile_image.getAttribute("src"), profile_images2[0]);
+            console.log("gak ada story");
+        }
+
+        // console.log(profile_image)
+
         follower = follower.replace(/\,/g, '');
         following = following.replace(/\,/g, '');
         var comments = influencer.comments;
@@ -76,20 +92,21 @@ async function crowling(influencer) {
 
         var fans_growth = influencer.followers > 0 ? follower - influencer.followers : "0";
 
-        let sql2 = "INSERT INTO `audience_related` (influencer_id, followers, followings, fans_growth, created_at) " +
+        let sql2 = "INSERT INTO `audience_relateds` (influencer_id, followers, followings, fans_growth, created_at) " +
                     "VALUES ('" + influencer.id + "', '" + follower + "', '" + following + "', '" + fans_growth + "', now())";
         await db.query(sql2, function (err, result) {
             if (err) throw err;
             console.log('Insert Data Berhasil')
         });
 
+        console.log("Profile Image : " + profile_image);
         console.log("Follower : " + follower);
         console.log("Following : " + following);
         console.log("Fans Growth : " + fans_growth);
 
         var engagement_rate = (comments + likes) / follower;
 
-        let sql = "UPDATE `influencers` SET `followers` = '" + follower + "', engagement_rate ='" +engagement_rate/100+ "' WHERE instagram_username = '" + influencer.instagram_username + "'";
+        let sql = "UPDATE `influencers` SET `image` = '" + profile_image + "', `followers` = '" + follower + "', engagement_rate ='" +engagement_rate/100+ "' WHERE instagram_username = '" + influencer.instagram_username + "'";
         await db.query(sql, function (err, result) {
             if (err) throw err;
             console.log('Update Data Influencers Berhasil')

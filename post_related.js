@@ -74,7 +74,7 @@ async function crowling(influencer) {
         // await page.type(ID.pass, CRED.pass);
         // await page.click('div[role="button"]')
 
-        await page.goto('https://instagram.com/' + influencer.instagram_username, {
+        await page.goto('https://www.instagram.com/' + influencer.instagram_username, {
             waitUntil: 'networkidle2'
         });
 
@@ -86,9 +86,19 @@ async function crowling(influencer) {
         for ( let i = 0; i < elements.length; i++ ){
             console.log("K : " + k + " L : " + l);
             const post_ids = await page.$x('//*[@id="react-root"]/section/main/div/div[3]/article/div/div/div[' + k + ']/div[' + l + ']/a')
-            let post_id = await page.evaluate(post_id => post_id.getAttribute("href"), post_ids[0]);
-            const images = await page.$x('//*[@id="react-root"]/section/main/div/div[3]/article/div/div/div[' + k + ']/div[' + l + ']/a/div/div/img')
-            let image = await page.evaluate(image => image.getAttribute("src"), images[0]);
+            let post_id = null;
+            let image = null;
+            if(typeof post_ids !== 'undefined' && post_ids.length > 0){
+                post_id = await page.evaluate(post_id => post_id.getAttribute("href"), post_ids[0]);
+                const images = await page.$x('//*[@id="react-root"]/section/main/div/div[3]/article/div/div/div[' + k + ']/div[' + l + ']/a/div/div/img')
+                image = await page.evaluate(image => image.getAttribute("src"), images[0]);
+            } else {
+                const post_ids2 = await page.$x('//*[@id="react-root"]/section/main/div/div[2]/article/div/div/div[' + k + ']/div[' + l + ']/a')
+                post_id = await page.evaluate(post_id => post_id.getAttribute("href"), post_ids2[0]);
+                const images2 = await page.$x('//*[@id="react-root"]/section/main/div/div[2]/article/div/div/div[' + k + ']/div[' + l + ']/a/div/div/img')
+                image = await page.evaluate(image => image.getAttribute("src"), images2[0]);
+            }
+
             l++;
             if(l > 3) k++;
             if(l > 3) l = 1;
@@ -97,13 +107,13 @@ async function crowling(influencer) {
             let ExInnerText = await page.evaluate(ExInnerText => ExInnerText.innerText, elements[i]);
             var res = ExInnerText.split(/\n/);
             
-            console.log("Post Id : " + post_id);
+            console.log(influencer.instagram_username + " - Post Id : " + post_id);
             console.log("Like : " + res[0] + " Comment : " + res[1]);
             let like = res[0];
             let comment = res[1];
             let update  = false;
 
-            let sql = "SELECT * FROM `post_related` WHERE influencer_id = '" + influencer.id + "' AND post_id  = '" + post_id + "'";
+            let sql = "SELECT * FROM `post_relateds` WHERE influencer_id = '" + influencer.id + "' AND post_id  = '" + post_id + "'";
             await db.query(sql, function (err, result) {
                 if (err) throw err;
                 if(result.length > 0){
@@ -112,14 +122,14 @@ async function crowling(influencer) {
             });
 
             if(!update){
-                let sql = "INSERT INTO `post_related` (influencer_id, post_id, `like`, `comment`, `image`, created_at) " +
+                let sql = "INSERT INTO `post_relateds` (influencer_id, post_id, `like`, `comment`, `image`, created_at) " +
                             "VALUES ('" + influencer.id + "', 'https://www.instagram.com" + post_id + "', '" + parser(like) + "', '" + parser(comment) + "', '" + image + "', now())";
                 await db.query(sql, function (err, result) {
                     if (err) throw err;
                     console.log('Insert Data Berhasil')
                 });
             } else {
-                let sql = "UPDATE `post_related` SET like = '" + parser(like) + "', comment = '" + parser(comment) + "' " + 
+                let sql = "UPDATE `post_relateds` SET like = '" + parser(like) + "', comment = '" + parser(comment) + "' " + 
                         "WHERE influencer_id = '" + influencer.id + "' AND post_id = 'https://www.instagram.com" + post_id + "'";
                 await db.query(sql, function (err, result) {
                     if (err) throw err;
